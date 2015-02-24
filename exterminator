@@ -1,0 +1,239 @@
+#!/usr/bin/python
+# encoding: utf-8
+
+import efl.elementary as elm
+
+from efl.elementary.box import Box
+from efl.elementary.button import Button
+from efl.elementary.check import Check
+from efl.elementary.label import Label
+from efl.elementary.icon import Icon
+from efl.elementary.frame import Frame
+from efl.elementary.progressbar import Progressbar
+from efl.elementary.separator import Separator
+from efl.elementary.window import StandardWindow
+from efl.evas import EVAS_HINT_EXPAND, EVAS_HINT_FILL
+from efl import ecore
+import psutil
+import os
+import getpass
+from elmextensions import SortedList
+
+EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
+FILL_BOTH = EVAS_HINT_FILL, EVAS_HINT_FILL
+FILL_HORIZ = EVAS_HINT_FILL, 0.5
+
+class MainWindow(StandardWindow):
+    def __init__(self):
+        StandardWindow.__init__(self, "exterminator", "Exterminator", size=(600, 400))
+        self.callback_delete_request_add(lambda o: elm.exit())
+        
+        icon = Icon(self)
+        icon.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
+        icon.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
+        icon.standard_set('utilities-system-monitor')
+        icon.show()
+        self.icon_object_set(icon.object_get())
+        
+        taskManager = TaskManager(self)
+        taskManager.show()
+        
+        self.resize_object_add(taskManager)
+
+class TaskManager(Box):
+    def __init__(self, parent):
+        Box.__init__(self, parent)
+        self.win = win = parent
+        self.appstokill = []
+        self.process = {}
+        
+        self.size_hint_weight = EXPAND_BOTH
+        self.size_hint_align = FILL_BOTH
+        
+        self.loop = ecore.timer_add(2.0, self.update)
+        
+        cpu = psutil.cpu_percent(interval=1) / 100.0
+        ram = psutil.virtual_memory()
+
+        #Totals in GB
+        ramtota = float(ram.total) / (1000000000)
+        ramused = float(ram.used - ram.buffers - ram.cached) / (1000000000)
+
+        ramframe = self.ramframe = Frame(self.win)
+        ramframe.show()
+        ramframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
+        ramframe.size_hint_align = FILL_BOTH
+        ramframe.text_set("RAM Usage:")
+
+        self.rambar = rambar = Progressbar(self.win, span_size=200, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+        size_hint_align=FILL_HORIZ)
+        rambar.show()
+        rambar.value_set(ramused/ramtota)
+        ramframe.content = rambar
+
+        cpuframe = self.cpuframe = Frame(self.win)
+        cpuframe.show()
+        cpuframe.text_set("CPU Usage:")
+        cpuframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
+        cpuframe.size_hint_align = FILL_BOTH
+
+        self.cpubar = cpubar = Progressbar(self.win, span_size=200, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+        size_hint_align=FILL_HORIZ)
+        cpubar.show()
+        cpubar.value_set(cpu)
+        cpuframe.content = cpubar
+        
+        titles = [("PID", True, 1), ("Process Name", True, 2), ("CPU", True, 1), ("Memory", True, 1), ("User", True, 1)]
+
+        self.slist = slist = SortedList(self, titles=titles,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH, homogeneous=True)
+
+        slist.show()
+
+        self.processes_build()
+
+        kills = Button(self.win)
+        kills.text = "Kill Selected Processes"
+        kills.callback_clicked_add(self.kill_selected)
+        kills.show()
+
+        tbox = Box(win)
+        tbox.horizontal = True
+        tbox.pack_end(cpuframe)
+        tbox.pack_end(ramframe)
+        tbox.show()
+
+        bbox = Box(win)
+        bbox.horizontal = True
+        bbox.pack_end(kills)
+        bbox.show()
+
+        self.pack_end(tbox)
+        self.pack_end(self.slist)
+        self.pack_end(bbox)
+
+    def update(self):
+        self.processes_build()
+        for p in self.process:
+            self.process[p].update()
+        self.slist.update()
+
+        cpu = psutil.cpu_percent(interval=1) / 100.0
+        ram = psutil.virtual_memory()
+
+        #Totals in GB
+        ramtota = float(ram.total) / (1000000000)
+        ramused = float(ram.used - ram.buffers - ram.cached) / (1000000000)
+
+        self.cpubar.value_set(cpu)
+        self.rambar.value_set(ramused/ramtota)
+
+        return 1
+
+    def run_command(self, command):
+        cmd = ecore.Exe(command)
+        cmd.on_del_event_add(self.processes_build)
+
+    def kill_selected( self, bt ):
+        for pid in self.appstokill:
+            self.kill_process(pid)
+
+    def check_sel( self, ck ):
+        if ck.state_get():
+            self.appstokill.append(ck.text)
+        else:
+            self.appstokill.remove(ck.text)
+        #print self.appstokill
+
+    def kill_process( self, pid ):
+        self.run_command("kill -9 %s"%pid)
+    
+    def processes_build( self, cmd=False, arg=False ):
+        #print "cmd %s , arg %s"%(cmd, arg)
+
+        tmp = psutil.get_process_list()
+        currentpids = []
+        pidstoremove = []
+        try:
+            for p in tmp:
+                if p.username == getpass.getuser():
+                    currentpids.append(p.pid)
+                    if p.pid not in self.process:
+                        cess = Process(self, p)
+                        self.process[p.pid] = cess
+                        self.slist.row_pack(cess, sort=False)
+        except:
+            print "Hit an exception. Might want to look into that if stuff isn't working right"
+        for pid in self.process:
+            if pid not in currentpids:
+                self.slist.row_unpack(self.process[pid], True)
+                pidstoremove.append(pid)
+        for pid in pidstoremove:
+            self.process.pop(pid, None)
+
+class Process(list):
+    def __init__(self, parent, data):
+        self.win = parent.win
+        self.dt = data
+
+        pd = str(data.pid)
+
+        pid = Check(self.win,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH)
+        pid.text = pd
+        pid.data["sort_data"] = data.pid
+        pid.callback_changed_add(parent.check_sel)
+        pid.show()
+
+        pname = Label(self.win,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH)
+        pname.text = data.name[0:25]
+        pname.show()
+
+        user = Label(self.win,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH)
+        user.text = data.username
+        user.show()
+
+        self.cpu = Label(self.win,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH)
+        cpu = self.dt.get_cpu_percent(interval=0) / 10.0
+        self.cpu.text = "%.2f"%cpu
+        self.cpu.data["sort_data"] = cpu
+        self.cpu.show()
+
+        self.mem = Label(self.win,   size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH)
+        mem = self.dt.get_memory_percent()
+        self.mem.text = "%.2f"%mem
+        self.mem.data["sort_data"] = mem
+        self.mem.show()
+
+        #bt = Button(self.win)
+        #bt.text = "Kill Process"
+        #bt.callback_pressed_add(parent.kill_process, data.pid)
+        #bt.show()
+
+        self.append(pid)
+        self.append(pname)
+        self.append(self.cpu)
+        self.append(self.mem)
+        self.append(user)
+        #self.append(bt)
+
+    def update(self):
+        #print str(self.dt.get_cpu_percent(interval=0))
+        cpu = self.dt.get_cpu_percent(interval=0) / 10.0
+        self.cpu.text = "%.2f"%cpu
+        self.cpu.data["sort_data"] = cpu
+        #print self.dt.get_memory_percent()
+        mem = self.dt.get_memory_percent()
+        self.mem.text = "%.2f"%mem
+        self.mem.data["sort_data"] = mem
+
+if __name__ == "__main__":
+    elm.init()
+    GUI = MainWindow()
+    GUI.show()
+    elm.run()
+    elm.shutdown()
