@@ -55,19 +55,20 @@ class TaskManager(Box):
         cpu = psutil.cpu_percent(interval=1) / 100.0
         ram = psutil.virtual_memory()
 
-        #Totals in GB
-        ramtota = float(ram.total) / (1000000000)
-        ramused = float(ram.used - ram.buffers - ram.cached) / (1000000000)
+        #Totals in MB
+        ramtota = float(ram.total) / (1000000)
+        ramused = ramtota * ram.percent * .01
 
         ramframe = self.ramframe = Frame(self.win)
         ramframe.show()
         ramframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
         ramframe.size_hint_align = FILL_BOTH
-        ramframe.text_set("RAM Usage:")
+        ramframe.text_set("Memory Usage:")
 
-        self.rambar = rambar = Progressbar(self.win, span_size=200, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+        self.rambar = rambar = Progressbar(self.win, span_size=250, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
         size_hint_align=FILL_HORIZ)
         rambar.show()
+        rambar.unit_format = "%.0f MB out of %.0f MB"%(ramused, ramtota)
         rambar.value_set(ramused/ramtota)
         ramframe.content = rambar
 
@@ -77,7 +78,7 @@ class TaskManager(Box):
         cpuframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
         cpuframe.size_hint_align = FILL_BOTH
 
-        self.cpubar = cpubar = Progressbar(self.win, span_size=200, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+        self.cpubar = cpubar = Progressbar(self.win, span_size=250, size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
         size_hint_align=FILL_HORIZ)
         cpubar.show()
         cpubar.value_set(cpu)
@@ -121,12 +122,14 @@ class TaskManager(Box):
         cpu = psutil.cpu_percent(interval=1) / 100.0
         ram = psutil.virtual_memory()
 
-        #Totals in GB
-        ramtota = float(ram.total) / (1000000000)
-        ramused = float(ram.used - ram.buffers - ram.cached) / (1000000000)
+        #Totals in MB
+        ramtota = float(ram.total) / (1000000)
+        ramused = ramtota * ram.percent * .01
 
+        
         self.cpubar.value_set(cpu)
         self.rambar.value_set(ramused/ramtota)
+        self.rambar.unit_format = "%.0f MB out of %.0f MB"%(ramused, ramtota)
 
         return 1
 

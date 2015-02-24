@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Exterminator
+GenericName=Task Manager
+Comment=Simple task manager
+Exec=epad %U
+Icon=utilities-system-monitor
+Terminal=false
+Type=Application
+MimeType=text/plain
+Categories=EFL;System;Utility;
+Actions=Window;Document;
+StartupWMClass=exterminator
