@@ -6,7 +6,6 @@ Exec=exterminator
 Icon=utilities-system-monitor
 Terminal=false
 Type=Application
-MimeType=text/plain
 Categories=EFL;System;Utility;
 Actions=Window;Document;
 StartupWMClass=exterminator
