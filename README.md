@@ -1,6 +1,10 @@
 Exterminator is a system process killer written in Python and Elementary
 
+Radiance Theme:
 ![alt text](https://raw.githubusercontent.com/JeffHoogland/exterminator/master/screenshot/exterminator.png "Exterminator") 
+
+Default Theme:
+![alt text](https://raw.githubusercontent.com/JeffHoogland/exterminator/master/screenshot/exterminator-default.png "Exterminator")
 
 Requires:
 - [python 2.7](https://www.python.org/)
