@@ -2,7 +2,7 @@
 Name=Exterminator
 GenericName=Task Manager
 Comment=Simple task manager
-Exec=epad %U
+Exec=exterminator
 Icon=utilities-system-monitor
 Terminal=false
 Type=Application

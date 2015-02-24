@@ -1,6 +1,64 @@
 #!/usr/bin/python
 # encoding: utf-8
 
+
+__author__ = "Jeff Hoogland"
+__contributors__ = ["Jeff Hoogland"]
+__copyright__ = "Copyright (C) 2014 Bodhi Linux"
+__version__ = "0.1.0"
+__description__ = 'A simple task manager for the Enlightenment Desktop.'
+__github__ = 'http://jeffhoogland.github.io/Exterminator/'
+__source__ = 'Source code and bug reports: {0}'.format(__github__)
+PY_EFL = "https://git.enlightenment.org/bindings/python/python-efl.git/"
+
+AUTHORS = """
+<br>
+<align=center>
+<hilight>Jeff Hoogland (Jef91)</hilight><br>
+<link><a href=http://www.jeffhoogland.com>Contact</a></link><br><br>
+</align>
+"""
+
+LICENSE = """<br>
+<align=center>
+<hilight>
+Copyright (c) 2014, Jeff Hoogland<br>
+All rights reserved.<br>
+</hilight>
+<br>
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:<br>
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.<br>
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.<br>
+    * Neither the name of the <organization> nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.<br>
+<br>
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+</align>
+<br>
+"""
+
+INFO = """
+<align=center>
+<hilight>Exterminator</hilight> is a simple task manager written in Elementary and Python.<br>
+<br>
+<br>
+</align>
+"""
+
 import efl.elementary as elm
 
 from efl.elementary.box import Box
@@ -17,6 +75,8 @@ from efl import ecore
 import psutil
 import os
 import getpass
+
+from elmextensions import AboutWindow
 from elmextensions import SortedList
 
 EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
@@ -97,6 +157,14 @@ class TaskManager(Box):
         kills.text = "Kill Selected Processes"
         kills.callback_clicked_add(self.kill_selected)
         kills.show()
+        
+        icon = Icon(self.win, thumb='True')
+        icon.standard_set('help-about')
+        
+        about = Button(self.win, size_hint_align=(1.0, 0.0))
+        about.content = icon
+        about.callback_clicked_add(self.showAbout)
+        about.show()
 
         tbox = Box(win)
         tbox.horizontal = True
@@ -107,6 +175,7 @@ class TaskManager(Box):
         bbox = Box(win)
         bbox.horizontal = True
         bbox.pack_end(kills)
+        bbox.pack_end(about)
         bbox.show()
 
         self.pack_end(tbox)
@@ -173,6 +242,12 @@ class TaskManager(Box):
                 pidstoremove.append(pid)
         for pid in pidstoremove:
             self.process.pop(pid, None)
+            
+    def showAbout(self, obj=False):
+        AboutWindow(self, title="Exterminator", standardicon="utilities-system-monitor", \
+                        version=__version__, authors=AUTHORS, \
+                        licen=LICENSE, webaddress=__github__, \
+                        info=INFO)
 
 class Process(list):
     def __init__(self, parent, data):
