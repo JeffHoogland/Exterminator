@@ -80,6 +80,7 @@ from elmextensions import AboutWindow
 from elmextensions import SortedList
 
 EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
+EXPAND_HORIZ = EVAS_HINT_EXPAND, 0.0
 FILL_BOTH = EVAS_HINT_FILL, EVAS_HINT_FILL
 FILL_HORIZ = EVAS_HINT_FILL, 0.5
 
@@ -116,7 +117,7 @@ class TaskManager(Box):
         ram = psutil.virtual_memory()
 
         #Totals in MB
-        ramtota = float(ram.total) / (1000000)
+        ramtota = float(ram.total) / (1048576)
         ramused = ramtota * ram.percent * .01
 
         ramframe = self.ramframe = Frame(self.win)
@@ -153,7 +154,8 @@ class TaskManager(Box):
 
         self.processes_build()
 
-        kills = Button(self.win)
+        kills = Button(self.win, size_hint_weight=EXPAND_HORIZ,
+            size_hint_align=FILL_HORIZ)
         kills.text = "Kill Selected Processes"
         kills.callback_clicked_add(self.kill_selected)
         kills.show()
@@ -172,7 +174,8 @@ class TaskManager(Box):
         tbox.pack_end(ramframe)
         tbox.show()
 
-        bbox = Box(win)
+        bbox = Box(win, size_hint_weight=EXPAND_HORIZ,
+            size_hint_align=FILL_HORIZ)
         bbox.horizontal = True
         bbox.pack_end(kills)
         bbox.pack_end(about)
@@ -185,14 +188,17 @@ class TaskManager(Box):
     def update(self):
         self.processes_build()
         for p in self.process:
-            self.process[p].update()
+            try:
+                self.process[p].update()
+            except:
+                pass
         self.slist.update()
 
         cpu = psutil.cpu_percent(interval=1) / 100.0
         ram = psutil.virtual_memory()
 
         #Totals in MB
-        ramtota = float(ram.total) / (1000000)
+        ramtota = float(ram.total) / (1048576)
         ramused = ramtota * ram.percent * .01
 
         
@@ -235,7 +241,8 @@ class TaskManager(Box):
                         self.process[p.pid] = cess
                         self.slist.row_pack(cess, sort=False)
         except:
-            print "Hit an exception. Might want to look into that if stuff isn't working right"
+            #print "Hit an exception. Might want to look into that if stuff isn't working right"
+            pass
         for pid in self.process:
             if pid not in currentpids:
                 self.slist.row_unpack(self.process[pid], True)
@@ -276,37 +283,33 @@ class Process(list):
         self.cpu = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
         cpu = self.dt.get_cpu_percent(interval=0) / 10.0
-        self.cpu.text = "%.2f"%cpu
+        self.cpu.text = "%.0f %%"%cpu
         self.cpu.data["sort_data"] = cpu
         self.cpu.show()
 
         self.mem = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        mem = self.dt.get_memory_percent()
-        self.mem.text = "%.2f"%mem
+        mem = self.dt.get_memory_info().rss
+        mem = float(mem)/1048576
+        self.mem.text = "%.1f MB"%mem
         self.mem.data["sort_data"] = mem
         self.mem.show()
-
-        #bt = Button(self.win)
-        #bt.text = "Kill Process"
-        #bt.callback_pressed_add(parent.kill_process, data.pid)
-        #bt.show()
 
         self.append(pid)
         self.append(pname)
         self.append(self.cpu)
         self.append(self.mem)
         self.append(user)
-        #self.append(bt)
 
     def update(self):
         #print str(self.dt.get_cpu_percent(interval=0))
         cpu = self.dt.get_cpu_percent(interval=0) / 10.0
-        self.cpu.text = "%.2f"%cpu
+        self.cpu.text = "%.0f %%"%cpu
         self.cpu.data["sort_data"] = cpu
         #print self.dt.get_memory_percent()
-        mem = self.dt.get_memory_percent()
-        self.mem.text = "%.2f"%mem
+        mem = self.dt.get_memory_info().rss
+        mem = float(mem)/1048576
+        self.mem.text = "%.1f MB"%mem
         self.mem.data["sort_data"] = mem
 
 if __name__ == "__main__":
