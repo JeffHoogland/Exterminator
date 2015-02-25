@@ -78,7 +78,10 @@ import os
 import getpass
 
 import threading
-import Queue
+try:
+    import Queue
+except:
+    import queue as Queue
 
 from elmextensions import AboutWindow
 from elmextensions import SortedList
