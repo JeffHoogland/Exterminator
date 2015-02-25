@@ -5,7 +5,7 @@
 __author__ = "Jeff Hoogland"
 __contributors__ = ["Jeff Hoogland"]
 __copyright__ = "Copyright (C) 2014 Bodhi Linux"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __description__ = 'A simple task manager for the Enlightenment Desktop.'
 __github__ = 'http://jeffhoogland.github.io/Exterminator/'
 __source__ = 'Source code and bug reports: {0}'.format(__github__)
@@ -76,6 +76,47 @@ import psutil
 import os
 import getpass
 
+import threading
+import Queue
+
+class ThreadedFunction(object):
+    def __init__(self, doneCB=None):
+        # private stuff
+        self._commandQueue = Queue.Queue()
+        self._replyQueue = Queue.Queue()
+        self._doneCB = doneCB
+
+        # add a timer to check the data returned by the worker thread
+        self._timer = ecore.Timer(0.1, self.checkReplyQueue)
+
+        # start the working thread
+        threading.Thread(target=self.threadFunc).start()
+
+    def run(self, action):
+        self._commandQueue.put(action)
+
+    def shutdown(self):
+        self._timer.delete()
+        self._commandQueue.put('QUIT')
+
+    def checkReplyQueue(self):
+        if not self._replyQueue.empty():
+            result = self._replyQueue.get()
+            if callable(self._doneCB):
+                self._doneCB()
+        return True
+
+    # all the member below this point run in the thread
+    def threadFunc(self):
+        while True:
+            # wait here until an item in the queue is present
+            func = self._commandQueue.get()
+            if callable(func):
+                func()
+            elif func == 'QUIT':
+                break
+            self._replyQueue.put("done")
+
 from elmextensions import AboutWindow
 from elmextensions import SortedList
 
@@ -87,7 +128,7 @@ FILL_HORIZ = EVAS_HINT_FILL, 0.5
 class MainWindow(StandardWindow):
     def __init__(self):
         StandardWindow.__init__(self, "exterminator", "Exterminator", size=(600, 400))
-        self.callback_delete_request_add(lambda o: elm.exit())
+        self.callback_delete_request_add(self.quitAll)
         
         icon = Icon(self)
         icon.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
@@ -96,10 +137,14 @@ class MainWindow(StandardWindow):
         icon.show()
         self.icon_object_set(icon.object_get())
         
-        taskManager = TaskManager(self)
-        taskManager.show()
+        self.taskManager = TaskManager(self)
+        self.taskManager.show()
         
-        self.resize_object_add(taskManager)
+        self.resize_object_add(self.taskManager)
+    
+    def quitAll(self, obj):
+        self.taskManager.threadedFunction.shutdown()
+        elm.exit()
 
 class TaskManager(Box):
     def __init__(self, parent):
@@ -108,10 +153,13 @@ class TaskManager(Box):
         self.appstokill = []
         self.process = {}
         
+        self.threadedFunction = ThreadedFunction(self.refreshGUI)
+        self.gettingData = False
+        
         self.size_hint_weight = EXPAND_BOTH
         self.size_hint_align = FILL_BOTH
         
-        self.loop = ecore.timer_add(2.0, self.update)
+        self.loop = ecore.timer_add(0.1, self.update)
         
         cpu = psutil.cpu_percent(interval=1) / 100.0
         ram = psutil.virtual_memory()
@@ -152,8 +200,6 @@ class TaskManager(Box):
 
         slist.show()
 
-        self.processes_build()
-
         kills = Button(self.win, size_hint_weight=EXPAND_HORIZ,
             size_hint_align=FILL_HORIZ)
         kills.text = "Kill Selected Processes"
@@ -184,33 +230,41 @@ class TaskManager(Box):
         self.pack_end(tbox)
         self.pack_end(self.slist)
         self.pack_end(bbox)
-
-    def update(self):
-        self.processes_build()
-        for p in self.process:
-            try:
-                self.process[p].update()
-            except:
-                pass
-        self.slist.update()
-
-        cpu = psutil.cpu_percent(interval=1) / 100.0
-        ram = psutil.virtual_memory()
-
-        #Totals in MB
-        ramtota = float(ram.total) / (1048576)
-        ramused = ramtota * ram.percent * .01
-
         
-        self.cpubar.value_set(cpu)
-        self.rambar.value_set(ramused/ramtota)
-        self.rambar.unit_format = "%.0f MB out of %.0f MB"%(ramused, ramtota)
+        self.pidstoupdate = {}
+        self.pidstoremove = []
 
+    def update(self, stuff=None, otherstuff=None):
+        if not self.gettingData:
+            self.threadedFunction.run(self.getPsUtilData)
+        
         return 1
+        
+    def refreshGUI(self):
+        for p in self.pidstoupdate:
+            if p in self.process:
+                self.process[p].update(self.pidstoupdate[p])
+            else:
+                cess = Process(self, self.pidstoupdate[p])
+                self.process[p] = cess
+                self.slist.row_pack(cess, sort=False)
+        
+        for p in self.pidstoremove:
+            self.slist.row_unpack(self.process[p], True)
+            self.process.pop(p, None)
+        
+        self.pidstoupdate.clear()
+        del self.pidstoremove[:]
+        
+        self.slist.update()
+        
+        self.cpubar.value_set(self.cpu)
+        self.rambar.value_set(self.ramused/self.ramtota)
+        self.rambar.unit_format = "%.0f MB out of %.0f MB"%(self.ramused, self.ramtota)
 
     def run_command(self, command):
         cmd = ecore.Exe(command)
-        cmd.on_del_event_add(self.processes_build)
+        cmd.on_del_event_add(self.update)
 
     def kill_selected( self, bt ):
         for pid in self.appstokill:
@@ -226,29 +280,30 @@ class TaskManager(Box):
     def kill_process( self, pid ):
         self.run_command("kill -9 %s"%pid)
     
-    def processes_build( self, cmd=False, arg=False ):
+    def getPsUtilData( self, cmd=False, arg=False ):
         #print "cmd %s , arg %s"%(cmd, arg)
-
+        self.gettingData = True
         tmp = psutil.get_process_list()
         currentpids = []
-        pidstoremove = []
-        try:
-            for p in tmp:
-                if p.username == getpass.getuser():
-                    currentpids.append(p.pid)
-                    if p.pid not in self.process:
-                        cess = Process(self, p)
-                        self.process[p.pid] = cess
-                        self.slist.row_pack(cess, sort=False)
-        except:
-            #print "Hit an exception. Might want to look into that if stuff isn't working right"
-            pass
+        for p in tmp:
+            if p.username == getpass.getuser():
+                currentpids.append(p.pid)
+                self.pidstoupdate[p.pid] = { "pid":p.pid, 
+                        "name":p.name, 
+                        "username": p.username, 
+                        "cpu": p.get_cpu_percent(interval=0) / 10.0, 
+                        "mem": float(p.get_memory_info().rss)/1048576}
         for pid in self.process:
             if pid not in currentpids:
-                self.slist.row_unpack(self.process[pid], True)
-                pidstoremove.append(pid)
-        for pid in pidstoremove:
-            self.process.pop(pid, None)
+                self.pidstoremove.append(pid)
+        
+        self.cpu = psutil.cpu_percent(interval=1) / 100.0
+        ram = psutil.virtual_memory()
+
+        #Totals in MB
+        self.ramtota = float(ram.total) / (1048576)
+        self.ramused = self.ramtota * ram.percent * .01
+        self.gettingData = False
             
     def showAbout(self, obj=False):
         AboutWindow(self, title="Exterminator", standardicon="utilities-system-monitor", \
@@ -261,36 +316,35 @@ class Process(list):
         self.win = parent.win
         self.dt = data
 
-        pd = str(data.pid)
+        pd = str(data["pid"])
 
         pid = Check(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
         pid.text = pd
-        pid.data["sort_data"] = data.pid
+        pid.data["sort_data"] = data["pid"]
         pid.callback_changed_add(parent.check_sel)
         pid.show()
 
         pname = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        pname.text = data.name[0:25]
+        pname.text = data["name"][0:25]
         pname.show()
 
         user = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        user.text = data.username
+        user.text = data["username"]
         user.show()
 
         self.cpu = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        cpu = self.dt.get_cpu_percent(interval=0) / 10.0
+        cpu = data["cpu"]
         self.cpu.text = "%.0f %%"%cpu
         self.cpu.data["sort_data"] = cpu
         self.cpu.show()
 
         self.mem = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        mem = self.dt.get_memory_info().rss
-        mem = float(mem)/1048576
+        mem = data["mem"]
         self.mem.text = "%.1f MB"%mem
         self.mem.data["sort_data"] = mem
         self.mem.show()
@@ -301,14 +355,12 @@ class Process(list):
         self.append(self.mem)
         self.append(user)
 
-    def update(self):
-        #print str(self.dt.get_cpu_percent(interval=0))
-        cpu = self.dt.get_cpu_percent(interval=0) / 10.0
+    def update(self, data):
+        self.dt = data
+        cpu = data["cpu"]
         self.cpu.text = "%.0f %%"%cpu
         self.cpu.data["sort_data"] = cpu
-        #print self.dt.get_memory_percent()
-        mem = self.dt.get_memory_info().rss
-        mem = float(mem)/1048576
+        mem = data["mem"]
         self.mem.text = "%.1f MB"%mem
         self.mem.data["sort_data"] = mem
 
