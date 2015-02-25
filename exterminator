@@ -70,6 +70,7 @@ from efl.elementary.frame import Frame
 from efl.elementary.progressbar import Progressbar
 from efl.elementary.separator import Separator
 from efl.elementary.window import StandardWindow
+from efl.elementary.flip import Flip, ELM_FLIP_CUBE_DOWN
 from efl.evas import EVAS_HINT_EXPAND, EVAS_HINT_FILL
 from efl import ecore
 import psutil
@@ -78,6 +79,14 @@ import getpass
 
 import threading
 import Queue
+
+from elmextensions import AboutWindow
+from elmextensions import SortedList
+
+EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
+EXPAND_HORIZ = EVAS_HINT_EXPAND, 0.0
+FILL_BOTH = EVAS_HINT_FILL, EVAS_HINT_FILL
+FILL_HORIZ = EVAS_HINT_FILL, 0.5
 
 class ThreadedFunction(object):
     def __init__(self, doneCB=None):
@@ -116,14 +125,6 @@ class ThreadedFunction(object):
             elif func == 'QUIT':
                 break
             self._replyQueue.put("done")
-
-from elmextensions import AboutWindow
-from elmextensions import SortedList
-
-EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
-EXPAND_HORIZ = EVAS_HINT_EXPAND, 0.0
-FILL_BOTH = EVAS_HINT_FILL, EVAS_HINT_FILL
-FILL_HORIZ = EVAS_HINT_FILL, 0.5
 
 class MainWindow(StandardWindow):
     def __init__(self):
@@ -226,9 +227,21 @@ class TaskManager(Box):
         bbox.pack_end(kills)
         bbox.pack_end(about)
         bbox.show()
+        
+        wheel = Progressbar(self, pulse_mode=True,
+                            size_hint_weight=EXPAND_BOTH,
+                            size_hint_align=FILL_HORIZ)
+        wheel.pulse(True)
+        wheel.show()
+        
+        self.flip = Flip(self, size_hint_weight=EXPAND_BOTH,
+                         size_hint_align=FILL_BOTH)
+        self.flip.part_content_set("back", self.slist)
+        self.flip.part_content_set("front", wheel)
+        self.flip.show()
 
         self.pack_end(tbox)
-        self.pack_end(self.slist)
+        self.pack_end(self.flip)
         self.pack_end(bbox)
         
         self.pidstoupdate = {}
@@ -250,8 +263,9 @@ class TaskManager(Box):
                 self.slist.row_pack(cess, sort=False)
         
         for p in self.pidstoremove:
-            self.slist.row_unpack(self.process[p], True)
-            self.process.pop(p, None)
+            if p in self.process:
+                self.slist.row_unpack(self.process[p], True)
+                self.process.pop(p, None)
         
         self.pidstoupdate.clear()
         del self.pidstoremove[:]
@@ -261,6 +275,9 @@ class TaskManager(Box):
         self.cpubar.value_set(self.cpu)
         self.rambar.value_set(self.ramused/self.ramtota)
         self.rambar.unit_format = "%.0f MB out of %.0f MB"%(self.ramused, self.ramtota)
+        
+        if self.flip.front_visible:
+            self.flip.go(ELM_FLIP_CUBE_DOWN)
 
     def run_command(self, command):
         cmd = ecore.Exe(command)
@@ -286,13 +303,16 @@ class TaskManager(Box):
         tmp = psutil.get_process_list()
         currentpids = []
         for p in tmp:
-            if p.username == getpass.getuser():
-                currentpids.append(p.pid)
-                self.pidstoupdate[p.pid] = { "pid":p.pid, 
-                        "name":p.name, 
-                        "username": p.username, 
-                        "cpu": p.get_cpu_percent(interval=0) / 10.0, 
-                        "mem": float(p.get_memory_info().rss)/1048576}
+            try:
+                if p.username == getpass.getuser():
+                    currentpids.append(p.pid)
+                    self.pidstoupdate[p.pid] = { "pid":p.pid, 
+                            "name":p.name, 
+                            "username": p.username, 
+                            "cpu": p.get_cpu_percent(interval=0) / 10.0, 
+                            "mem": float(p.get_memory_info().rss)/1048576}
+            except:
+                pass
         for pid in self.process:
             if pid not in currentpids:
                 self.pidstoremove.append(pid)
