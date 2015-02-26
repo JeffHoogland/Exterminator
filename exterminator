@@ -3,9 +3,9 @@
 
 
 __author__ = "Jeff Hoogland"
-__contributors__ = ["Jeff Hoogland"]
+__contributors__ = ["Jeff Hoogland", "Scimmia"]
 __copyright__ = "Copyright (C) 2014 Bodhi Linux"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __description__ = 'A simple task manager for the Enlightenment Desktop.'
 __github__ = 'http://jeffhoogland.github.io/Exterminator/'
 __source__ = 'Source code and bug reports: {0}'.format(__github__)
@@ -16,6 +16,7 @@ AUTHORS = """
 <align=center>
 <hilight>Jeff Hoogland (Jef91)</hilight><br>
 <link><a href=http://www.jeffhoogland.com>Contact</a></link><br><br>
+Scimmia<br><br>
 </align>
 """
 
@@ -309,10 +310,18 @@ class TaskManager(Box):
             #in psutil 1.2.1 we can reference these directly
             username = p.username
             name = p.name
-            if not username:
-                #in psutil 2.0 we need to call them
-                username = p.username()
-                name = p.name()
+            try:
+                #python 2 check
+                if not isinstance(name, basestring):
+                    #in psutil 2.0 we need to call them
+                    username = p.username()
+                    name = p.name()
+            except:
+                #python 3 check
+                if not isinstance(name, str):
+                    #in psutil 2.0 we need to call them
+                    username = p.username()
+                    name = p.name()
             try:
                 if username == getpass.getuser():
                     currentpids.append(p.pid)
