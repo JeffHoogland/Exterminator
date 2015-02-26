@@ -307,11 +307,19 @@ class TaskManager(Box):
         currentpids = []
         for p in tmp:
             try:
-                if p.username == getpass.getuser():
+                #in psutil 1.2.1 we can reference these directly
+                username = p.username
+                name = p.name
+            except:
+                #in psutil 2.0 we need to call them
+                username = p.username()
+                name = p.name()
+            try:
+                if username == getpass.getuser():
                     currentpids.append(p.pid)
                     self.pidstoupdate[p.pid] = { "pid":p.pid, 
-                            "name":p.name, 
-                            "username": p.username, 
+                            "name": name, 
+                            "username": username, 
                             "cpu": p.get_cpu_percent(interval=0) / 10.0, 
                             "mem": float(p.get_memory_info().rss)/1048576}
             except:
