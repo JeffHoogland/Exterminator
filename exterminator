@@ -310,18 +310,10 @@ class TaskManager(Box):
             #in psutil 1.2.1 we can reference these directly
             username = p.username
             name = p.name
-            try:
-                #python 2 check
-                if not isinstance(name, basestring):
-                    #in psutil 2.0 we need to call them
-                    username = p.username()
-                    name = p.name()
-            except:
-                #python 3 check
-                if not isinstance(name, str):
-                    #in psutil 2.0 we need to call them
-                    username = p.username()
-                    name = p.name()
+            if callable(name):
+                #in psutil 2.0 we need to call them
+                username = p.username()
+                name = p.name()
             try:
                 if username == getpass.getuser():
                     currentpids.append(p.pid)
