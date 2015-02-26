@@ -306,11 +306,10 @@ class TaskManager(Box):
         tmp = psutil.get_process_list()
         currentpids = []
         for p in tmp:
-            try:
-                #in psutil 1.2.1 we can reference these directly
-                username = p.username
-                name = p.name
-            except:
+            #in psutil 1.2.1 we can reference these directly
+            username = p.username
+            name = p.name
+            if not username:
                 #in psutil 2.0 we need to call them
                 username = p.username()
                 name = p.name()
