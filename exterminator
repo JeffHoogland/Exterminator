@@ -5,7 +5,7 @@
 __author__ = "Jeff Hoogland"
 __contributors__ = ["Jeff Hoogland", "Scimmia"]
 __copyright__ = "Copyright (C) 2014 Bodhi Linux"
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __description__ = 'A simple task manager for the Enlightenment Desktop.'
 __github__ = 'http://jeffhoogland.github.io/Exterminator/'
 __source__ = 'Source code and bug reports: {0}'.format(__github__)
@@ -307,14 +307,14 @@ class TaskManager(Box):
         tmp = psutil.get_process_list()
         currentpids = []
         for p in tmp:
-            #in psutil 1.2.1 we can reference these directly
-            username = p.username
-            name = p.name
-            if callable(name):
-                #in psutil 2.0 we need to call them
-                username = p.username()
-                name = p.name()
             try:
+                #in psutil 1.2.1 we can reference these directly
+                username = p.username
+                name = p.name
+                if callable(name):
+                    #in psutil 2.0 we need to call them
+                    username = p.username()
+                    name = p.name()
                 if username == getpass.getuser():
                     currentpids.append(p.pid)
                     self.pidstoupdate[p.pid] = { "pid":p.pid, 
