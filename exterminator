@@ -5,7 +5,7 @@
 __author__ = "Jeff Hoogland"
 __contributors__ = ["Jeff Hoogland", "Scimmia"]
 __copyright__ = "Copyright (C) 2014 Bodhi Linux"
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __description__ = 'A simple task manager for the Enlightenment Desktop.'
 __github__ = 'http://jeffhoogland.github.io/Exterminator/'
 __source__ = 'Source code and bug reports: {0}'.format(__github__)
@@ -198,7 +198,7 @@ class TaskManager(Box):
         cpubar.value_set(cpu)
         cpuframe.content = cpubar
         
-        titles = [("PID", True, 1), ("Process Name", True, 2), ("CPU", True, 1), ("Memory", True, 1), ("User", True, 1)]
+        titles = [("PID", True), ("Process Name", True), ("CPU", True), ("Memory", True), ("User", True)]
 
         self.slist = slist = SortedList(self, titles=titles,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH, homogeneous=True)
@@ -358,7 +358,8 @@ class Process(list):
 
         pname = Label(self.win,   size_hint_weight=EXPAND_BOTH,
             size_hint_align=FILL_BOTH)
-        pname.text = data["name"][0:25]
+        #pname.text = data["name"][0:25]
+        pname.text = data["name"]
         pname.show()
 
         user = Label(self.win,   size_hint_weight=EXPAND_BOTH,
