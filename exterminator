@@ -250,6 +250,13 @@ class TaskManager(Box):
         
         self.pidstoupdate = {}
         self.pidstoremove = []
+        
+        try:
+            #psutil 2.x method
+            self.cpuCount = psutil.cpu_count()
+        except:
+            #psutil 1.x method
+            self.cpuCount = psutil.NUM_CPUS
 
     def update(self, stuff=None, otherstuff=None):
         if not self.gettingData:
@@ -316,17 +323,11 @@ class TaskManager(Box):
                     username = p.username()
                     name = p.name()
                 if username == getpass.getuser():
-                    try:
-                        #psutil 2.x method
-                        cpuCount = psutil.cpu_count()
-                    except:
-                        #psutil 1.x method
-                        cpuCount = psutil.NUM_CPUS
                     currentpids.append(p.pid)
                     self.pidstoupdate[p.pid] = { "pid":p.pid, 
                             "name": name, 
                             "username": username, 
-                            "cpu": p.get_cpu_percent(interval=0) / cpuCount, 
+                            "cpu": p.get_cpu_percent(interval=0) / self.cpuCount, 
                             "mem": float(p.get_memory_info().rss)/1048576}
             except:
                 pass
