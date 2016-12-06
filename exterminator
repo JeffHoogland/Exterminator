@@ -311,7 +311,7 @@ class TaskManager(Box):
     def getPsUtilData( self, cmd=False, arg=False ):
         #print "cmd %s , arg %s"%(cmd, arg)
         self.gettingData = True
-        tmp = psutil.get_process_list()
+        tmp = list(psutil.process_iter())
         currentpids = []
         for p in tmp:
             try:
@@ -327,8 +327,8 @@ class TaskManager(Box):
                     self.pidstoupdate[p.pid] = { "pid":p.pid, 
                             "name": name, 
                             "username": username, 
-                            "cpu": p.get_cpu_percent(interval=0) / self.cpuCount, 
-                            "mem": float(p.get_memory_info().rss)/1048576}
+                            "cpu": p.cpu_percent(interval=0) / self.cpuCount, 
+                            "mem": float(p.memory_info().rss)/1048576}
             except:
                 pass
         for pid in self.process:
