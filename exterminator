@@ -84,7 +84,7 @@ try:
 except:
     import queue as Queue
 
-from elmextensions import AboutWindow
+from elmextensions import AboutWindow, InstanceError
 from elmextensions import SortedList
 
 EXPAND_BOTH = EVAS_HINT_EXPAND, EVAS_HINT_EXPAND
@@ -344,10 +344,13 @@ class TaskManager(Box):
         self.gettingData = False
             
     def showAbout(self, obj=False):
-        AboutWindow(self, title="Exterminator", standardicon="utilities-system-monitor", \
+        try:
+            AboutWindow(self, title="Exterminator", standardicon="utilities-system-monitor", \
                         version=__version__, authors=AUTHORS, \
                         licen=LICENSE, webaddress=__github__, \
                         info=INFO)
+        except InstanceError:
+            pass
 
 class Process(list):
     def __init__(self, parent, data):
